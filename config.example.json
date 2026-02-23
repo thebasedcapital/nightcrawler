@@ -1,0 +1,19 @@
+{
+  "max_duration_hours": 12,
+  "max_episodes": 24,
+  "max_budget_usd": 50.00,
+  "budget_per_episode_usd": 5.00,
+  "episode_timeout_seconds": 3600,
+  "model": "claude-opus-4-6",
+  "bootstrap_command": null,
+  "error_threshold": 10,
+  "diminishing_returns_lookback": 3,
+  "cooldown_between_episodes_seconds": 10,
+  "moshi_token": "",
+  "notifications": {
+    "on_start": true,
+    "on_episode_complete": false,
+    "on_error": true,
+    "on_completion": true
+  }
+}

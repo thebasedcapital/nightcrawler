@@ -1,0 +1,7 @@
+node_modules/
+state/
+logs/
+missions/active/
+*.log
+package-lock.json
+config.json

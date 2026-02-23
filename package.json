@@ -1,0 +1,13 @@
+{
+  "name": "nightcrawler",
+  "version": "1.0.0",
+  "description": "Autonomous overnight agent loop for Claude Code",
+  "type": "module",
+  "scripts": {
+    "start": "tsx nightcrawler.ts",
+    "dry-run": "tsx nightcrawler.ts --dry-run"
+  },
+  "dependencies": {
+    "tsx": "^4.19.0"
+  }
+}

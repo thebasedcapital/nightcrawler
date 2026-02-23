@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.user.nightcrawler</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/npx</string>
+        <string>tsx</string>
+        <string>/Users/bbclaude/.nightcrawler/nightcrawler.ts</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/bbclaude/.nightcrawler</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/Users/bbclaude/.local/bin</string>
+        <key>HOME</key>
+        <string>/Users/bbclaude</string>
+    </dict>
+
+    <!-- Don't auto-start — manually loaded when mission is ready -->
+    <key>RunAtLoad</key>
+    <false/>
+
+    <!-- Restart on crash, but not on clean exit -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>Crashed</key>
+        <true/>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <!-- Don't restart more than once per 30 seconds -->
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <!-- Hard timeout: 12 hours -->
+    <key>TimeOut</key>
+    <integer>43200</integer>
+
+    <!-- Logging -->
+    <key>StandardOutPath</key>
+    <string>/Users/bbclaude/.nightcrawler/logs/launchd-stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/bbclaude/.nightcrawler/logs/launchd-stderr.log</string>
+
+    <!-- Resource limits -->
+    <key>SoftResourceLimits</key>
+    <dict>
+        <key>NumberOfFiles</key>
+        <integer>4096</integer>
+    </dict>
+
+    <key>Nice</key>
+    <integer>5</integer>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
