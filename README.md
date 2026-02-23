@@ -507,6 +507,118 @@ When Claude Code detects the CLAUDECODE env var, it adjusts its behavior for bei
 **Why git diff verification?**
 Autonomous agents can hallucinate progress -- claiming they wrote files that don't exist or made changes that aren't in the diff. Injecting the actual git state lets the next episode detect and correct this.
 
+## Research Toolkit
+
+Nightcrawler includes a research-specific extension that adds paper monitoring, structured research missions, and knowledge synthesis.
+
+### Architecture
+
+```
+┌──────────────────────────────────────────────────────┐
+│                 Nightcrawler Research                  │
+├──────────────────────────────────────────────────────┤
+│                                                       │
+│  WATCHTOWER (Paper Monitor)                           │
+│  ├─ arXiv RSS feed (daily, per-topic)                │
+│  ├─ arXiv Search API (keyword-based, any day)        │
+│  ├─ Semantic Scholar API (225M papers)               │
+│  └─ → Generates MISSION.md when relevant paper found │
+│                                                       │
+│  RESEARCH SKILL (Enhanced Episode Instructions)       │
+│  ├─ API reference: Semantic Scholar, OpenAlex, arXiv │
+│  ├─ Breadth → Depth → Synthesis methodology          │
+│  ├─ Confidence scoring (HIGH/MEDIUM/LOW/UNVERIFIED)  │
+│  └─ Structured bibliography format                   │
+│                                                       │
+│  SYNTHESIS (Post-Mission Knowledge Merger)            │
+│  ├─ Extracts findings from research output           │
+│  ├─ Detects contradictions across papers             │
+│  ├─ Maintains running literature review              │
+│  └─ Syncs to VaultGraph knowledge base               │
+│                                                       │
+│  MISSION TEMPLATES (5 research-specific)              │
+│  ├─ Literature survey                                │
+│  ├─ Paper deep-dive                                  │
+│  ├─ Gap analysis                                     │
+│  ├─ Systematic review                                │
+│  └─ Follow-up investigation                          │
+│                                                       │
+└──────────────────────────────────────────────────────┘
+```
+
+### Quick Start (Research)
+
+```bash
+# 1. Poll for new papers
+cd ~/.nightcrawler && npx tsx research/ncr.ts watch
+
+# 2. Generate a research mission
+npx tsx research/ncr.ts research "autonomous AI research agents"
+
+# 3. Launch Nightcrawler to execute the mission
+npx tsx research/ncr.ts launch
+
+# 4. After mission completes, synthesize findings
+npx tsx research/ncr.ts synthesize
+
+# 5. View the running literature review
+npx tsx research/ncr.ts review
+```
+
+### Research CLI (`ncr`)
+
+| Command | Description |
+|---------|-------------|
+| `ncr watch` | Poll arXiv & Semantic Scholar for new papers |
+| `ncr watch --daemon` | Run watchtower continuously |
+| `ncr research "topic"` | Generate a literature survey mission |
+| `ncr deepdive "url"` | Generate a paper deep-dive mission |
+| `ncr papers` | List tracked papers with relevance scores |
+| `ncr synthesize` | Merge research output into knowledge base |
+| `ncr review` | Show running literature review |
+| `ncr status` | Show watchtower + mission status |
+| `ncr launch` | Launch Nightcrawler with active mission |
+| `ncr templates` | List available mission templates |
+
+### Paper Monitoring
+
+Configure `research/research-config.json`:
+
+```json
+{
+  "topics": ["cs.AI", "cs.MA", "cs.SE"],
+  "keywords": ["autonomous agent", "multi-agent", "episodic"],
+  "semantic_scholar_api_key": "",
+  "poll_interval_minutes": 60,
+  "auto_launch": false,
+  "min_citation_count": 0,
+  "max_papers_per_poll": 20,
+  "relevance_threshold": 0.3,
+  "vault_path": "",
+  "output_dir": "research"
+}
+```
+
+Papers are scored by keyword relevance (title matches weighted 2x) with optional vault-aware boosting: papers whose abstracts connect to your existing notes in VaultGraph score higher.
+
+### Free APIs Used
+
+| API | Coverage | Cost |
+|-----|----------|------|
+| [Semantic Scholar](https://api.semanticscholar.org/) | 225M papers, recommendations | Free (100 RPS with key) |
+| [OpenAlex](https://openalex.org/) | 240M works, 50K added daily | Free (CC0) |
+| [arXiv](https://info.arxiv.org/help/api/) | RSS feeds + search API | Free |
+
+### What Makes This Different
+
+The gap in existing tools: no single system connects **paper monitoring → autonomous research → knowledge synthesis**.
+
+- **AI-Scientist** (Sakana, 12k stars): Does the research, but doesn't monitor for new opportunities
+- **Ralph Loop** (snarktank, 11k stars): Loops autonomously, but has no research tooling
+- **Elicit**: Monitors papers, but can't act autonomously
+- **SciAgents** (MIT): Builds knowledge graphs, but can't run overnight
+- **Nightcrawler Research**: Watchtower detects paper → generates mission → Nightcrawler executes overnight → synthesis merges into knowledge graph → cycle repeats
+
 ## Requirements
 
 - macOS (for launchd; the orchestrator itself is platform-agnostic)
