@@ -21,12 +21,17 @@ pub struct ResearchConfig {
     pub vault_path: String,
     #[serde(default = "default_output_dir")]
     pub output_dir: String,
+    #[serde(default)]
+    pub negative_keywords: Vec<String>,
+    #[serde(default = "default_min_keyword_matches")]
+    pub min_keyword_matches: usize,
 }
 
 fn default_poll_interval() -> u64 { 60 }
 fn default_max_papers() -> usize { 20 }
 fn default_threshold() -> f64 { 0.3 }
 fn default_output_dir() -> String { "research".into() }
+fn default_min_keyword_matches() -> usize { 2 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NightcrawlerConfig {

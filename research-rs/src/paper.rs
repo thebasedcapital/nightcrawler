@@ -24,12 +24,16 @@ pub struct Paper {
     pub mission_generated: bool,
 }
 
+pub fn normalize_id(id: &str) -> String {
+    id.to_lowercase()
+}
+
 pub fn load_seen_ids(path: &Path) -> HashSet<String> {
     let mut seen = HashSet::new();
     if let Ok(file) = std::fs::File::open(path) {
         for line in std::io::BufReader::new(file).lines().flatten() {
             if let Ok(p) = serde_json::from_str::<Paper>(&line) {
-                seen.insert(p.id);
+                seen.insert(normalize_id(&p.id));
             }
         }
     }
@@ -64,6 +68,11 @@ pub fn match_keywords(text: &str, keywords: &[String]) -> Vec<String> {
         .collect()
 }
 
+pub fn has_negative_keywords(text: &str, negative_keywords: &[String]) -> bool {
+    let lower = text.to_lowercase();
+    negative_keywords.iter().any(|nk| lower.contains(&nk.to_lowercase()))
+}
+
 pub fn score_relevance(title: &str, abstract_text: &str, keywords: &[String]) -> f64 {
     let title_matches = match_keywords(title, keywords);
     let abstract_matches = match_keywords(abstract_text, keywords);
@@ -73,11 +82,16 @@ pub fn score_relevance(title: &str, abstract_text: &str, keywords: &[String]) ->
         unique.insert(m.as_str());
     }
 
+    // Title matches are 3x more valuable than abstract matches
     let total = keywords.len().max(1) as f64;
-    let mut score = (title_matches.len() as f64 * 2.0 + abstract_matches.len() as f64) / (total * 3.0);
+    let mut score = (title_matches.len() as f64 * 3.0 + abstract_matches.len() as f64) / (total * 4.0);
 
-    if unique.len() >= 3 { score *= 1.5; }
-    if unique.len() >= 5 { score *= 1.5; }
+    // Bonus for breadth of keyword coverage
+    if unique.len() >= 3 { score *= 1.4; }
+    if unique.len() >= 4 { score *= 1.3; }
+
+    // Penalty if no title matches at all (purely abstract matches are weaker signals)
+    if title_matches.is_empty() { score *= 0.6; }
 
     score.min(1.0)
 }

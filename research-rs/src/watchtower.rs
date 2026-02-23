@@ -160,6 +160,7 @@ struct S2Paper {
     r#abstract: Option<String>,
     url: Option<String>,
     year: Option<i32>,
+    #[allow(dead_code)]
     #[serde(rename = "citationCount")]
     citation_count: Option<u32>,
     #[serde(rename = "publicationDate")]
@@ -189,20 +190,35 @@ async fn search_semantic_scholar(query: &str, api_key: &str, limit: usize) -> Ve
     log(&format!("S2_SEARCH | \"{}\"", query));
 
     let client = reqwest::Client::new();
-    let mut req = client.get(&url);
-    if !api_key.is_empty() {
-        req = req.header("x-api-key", api_key);
+
+    // Retry with exponential backoff (429 is common without API key)
+    let mut resp = None;
+    for attempt in 0..3 {
+        let mut req = client.get(&url);
+        if !api_key.is_empty() {
+            req = req.header("x-api-key", api_key);
+        }
+
+        match req.send().await {
+            Ok(r) if r.status().as_u16() == 429 => {
+                let wait = (attempt + 1) * 2;
+                log(&format!("S2_RATE_LIMITED | attempt {} | waiting {}s", attempt + 1, wait));
+                tokio::time::sleep(tokio::time::Duration::from_secs(wait)).await;
+                continue;
+            }
+            Ok(r) if r.status().is_success() => { resp = Some(r); break; }
+            Ok(r) => {
+                log(&format!("S2_API_ERROR | {} | {}", r.status().as_u16(), query));
+                return vec![];
+            }
+            Err(e) => { log(&format!("S2_FETCH_ERROR | {}", e)); return vec![]; }
+        }
     }
 
-    let resp = match req.send().await {
-        Ok(r) => r,
-        Err(e) => { log(&format!("S2_FETCH_ERROR | {}", e)); return vec![]; }
+    let resp = match resp {
+        Some(r) => r,
+        None => { log(&format!("S2_EXHAUSTED | all retries failed for: {}", query)); return vec![]; }
     };
-
-    if !resp.status().is_success() {
-        log(&format!("S2_API_ERROR | {} | {}", resp.status().as_u16(), query));
-        return vec![];
-    }
 
     let data: S2Response = match resp.json().await {
         Ok(d) => d,
@@ -343,19 +359,24 @@ fn process_raw_papers(
     papers_path: &std::path::Path,
 ) {
     for raw_p in raw {
-        if seen.contains(&raw_p.id) { continue; }
+        let norm_id = paper::normalize_id(&raw_p.id);
+        if seen.contains(&norm_id) { continue; }
 
-        let matched = paper::match_keywords(
-            &format!("{} {}", raw_p.title, raw_p.abstract_text),
-            &config.keywords,
-        );
-        if matched.is_empty() { continue; }
+        let full_text = format!("{} {}", raw_p.title, raw_p.abstract_text);
+        let matched = paper::match_keywords(&full_text, &config.keywords);
+
+        // Require minimum keyword matches
+        if matched.len() < config.min_keyword_matches { continue; }
+
+        // Skip papers matching negative keywords
+        if !config.negative_keywords.is_empty()
+            && paper::has_negative_keywords(&full_text, &config.negative_keywords) { continue; }
 
         let relevance = paper::score_relevance(&raw_p.title, &raw_p.abstract_text, &config.keywords);
         if relevance < config.relevance_threshold { continue; }
 
         let p = Paper {
-            id: raw_p.id.clone(),
+            id: norm_id.clone(),
             source: source.to_string(),
             title: raw_p.title,
             authors: raw_p.authors,
@@ -371,7 +392,7 @@ fn process_raw_papers(
 
         log(&format!("NEW_PAPER | {} | {:.2} | {}", p.source, p.relevance_score, &p.title[..80.min(p.title.len())]));
         paper::append_paper(papers_path, &p);
-        seen.insert(raw_p.id);
+        seen.insert(norm_id);
         new_papers.push(p);
     }
 }
