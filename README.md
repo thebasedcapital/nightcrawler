@@ -509,80 +509,195 @@ Autonomous agents can hallucinate progress -- claiming they wrote files that don
 
 ## Research Toolkit
 
-Nightcrawler includes a research-specific extension that adds paper monitoring, structured research missions, and knowledge synthesis.
+Nightcrawler ships with a research-specific extension: a paper monitor that watches arXiv and Semantic Scholar overnight, a synthesis engine that merges findings into a running literature review, and a suite of structured mission templates purpose-built for academic research tasks. All glued together by a single CLI wrapper (`ncr`) that generates missions, launches Nightcrawler, and synthesizes output.
+
+The goal: wake up to a literature review, not a blank terminal.
 
 ### Architecture
 
 ```
-┌──────────────────────────────────────────────────────┐
-│                 Nightcrawler Research                  │
-├──────────────────────────────────────────────────────┤
-│                                                       │
-│  WATCHTOWER (Paper Monitor)                           │
-│  ├─ arXiv RSS feed (daily, per-topic)                │
-│  ├─ arXiv Search API (keyword-based, any day)        │
-│  ├─ Semantic Scholar API (225M papers)               │
-│  └─ → Generates MISSION.md when relevant paper found │
-│                                                       │
-│  RESEARCH SKILL (Enhanced Episode Instructions)       │
-│  ├─ API reference: Semantic Scholar, OpenAlex, arXiv │
-│  ├─ Breadth → Depth → Synthesis methodology          │
-│  ├─ Confidence scoring (HIGH/MEDIUM/LOW/UNVERIFIED)  │
-│  └─ Structured bibliography format                   │
-│                                                       │
-│  SYNTHESIS (Post-Mission Knowledge Merger)            │
-│  ├─ Extracts findings from research output           │
-│  ├─ Detects contradictions across papers             │
-│  ├─ Maintains running literature review              │
-│  └─ Syncs to VaultGraph knowledge base               │
-│                                                       │
-│  MISSION TEMPLATES (5 research-specific)              │
-│  ├─ Literature survey                                │
-│  ├─ Paper deep-dive                                  │
-│  ├─ Gap analysis                                     │
-│  ├─ Systematic review                                │
-│  └─ Follow-up investigation                          │
-│                                                       │
-└──────────────────────────────────────────────────────┘
+                        WATCHTOWER
+                    (research/watchtower.ts)
+              ┌─────────────────────────────────┐
+              │  arXiv RSS  arXiv Search API     │
+              │  Semantic Scholar (225M papers)  │
+              │  Relevance scoring + dedup       │
+              │  → papers.jsonl                  │
+              └──────────────┬──────────────────┘
+                             │ relevant paper detected
+                             ▼
+                        NCR CLI
+                    (research/ncr.ts)
+              ┌─────────────────────────────────┐
+              │  ncr research "topic"            │
+              │  ncr deepdive "arxiv.org/..."    │
+              │  → renders MISSION.md template   │
+              └──────────────┬──────────────────┘
+                             │ MISSION.md written
+                             ▼
+                      NIGHTCRAWLER
+                    (nightcrawler.ts)
+              ┌─────────────────────────────────┐
+              │  Episode 1: breadth scan         │
+              │  Episode 2: deep-dive A          │
+              │  Episode 3: deep-dive B          │
+              │  Episode N: synthesis            │
+              │  (crash recovery, budget caps,   │
+              │   immutable task tracking)       │
+              └──────────────┬──────────────────┘
+                             │ research/*.md written
+                             ▼
+                       SYNTHESIS
+                   (research/synthesis.ts)
+              ┌─────────────────────────────────┐
+              │  Reads research output markdown  │
+              │  Extracts findings + confidence  │
+              │  Detects contradictions          │
+              │  Maintains literature-review.md  │
+              └─────────────────────────────────┘
 ```
 
-### Quick Start (Research)
+### Quick Start (Research Mode)
 
 ```bash
-# 1. Poll for new papers
-cd ~/.nightcrawler && npx tsx research/ncr.ts watch
+cd ~/.nightcrawler
 
-# 2. Generate a research mission
+# 1. Start watching for new papers (one-shot poll)
+npx tsx research/ncr.ts watch
+
+# 2. Generate a literature survey mission
 npx tsx research/ncr.ts research "autonomous AI research agents"
 
-# 3. Launch Nightcrawler to execute the mission
+# 3. (Optional) Preview mission before launching
+cat missions/active/MISSION.md
+
+# 4. Launch Nightcrawler to execute the mission overnight
 npx tsx research/ncr.ts launch
 
-# 4. After mission completes, synthesize findings
+# 5. Monitor progress
+npx tsx research/ncr.ts status
+
+# 6. After mission completes, synthesize findings
 npx tsx research/ncr.ts synthesize
 
-# 5. View the running literature review
+# 7. View the running literature review
 npx tsx research/ncr.ts review
+```
+
+To deep-dive a specific paper from an arXiv URL:
+
+```bash
+npx tsx research/ncr.ts deepdive "https://arxiv.org/abs/2510.16572"
+npx tsx research/ncr.ts launch
+```
+
+To run the paper monitor continuously in the background:
+
+```bash
+npx tsx research/ncr.ts watch --daemon
 ```
 
 ### Research CLI (`ncr`)
 
+All commands are run via `npx tsx research/ncr.ts <command>` from `~/.nightcrawler`, or aliased as `ncr` if you add it to your PATH.
+
 | Command | Description |
 |---------|-------------|
-| `ncr watch` | Poll arXiv & Semantic Scholar for new papers |
-| `ncr watch --daemon` | Run watchtower continuously |
-| `ncr research "topic"` | Generate a literature survey mission |
-| `ncr deepdive "url"` | Generate a paper deep-dive mission |
-| `ncr papers` | List tracked papers with relevance scores |
-| `ncr synthesize` | Merge research output into knowledge base |
-| `ncr review` | Show running literature review |
-| `ncr status` | Show watchtower + mission status |
-| `ncr launch` | Launch Nightcrawler with active mission |
-| `ncr templates` | List available mission templates |
+| `ncr watch` | One-shot poll: arXiv RSS + Search + Semantic Scholar. Prints new papers found. |
+| `ncr watch --daemon` | Continuous polling on `poll_interval_minutes` schedule. |
+| `ncr research "topic"` | Generate a `MISSION-literature-survey.md` mission for a topic. |
+| `ncr deepdive "url"` | Generate a `MISSION-paper-deepdive.md` mission from an arXiv URL. |
+| `ncr papers` | List all tracked papers in `papers.jsonl` with relevance scores. |
+| `ncr synthesize` | Run synthesis on all `research/*.md` output files. |
+| `ncr review` | Print the current `literature-review.md`. |
+| `ncr status` | Show watchtower config, paper count, mission status, last poll time. |
+| `ncr launch` | Start Nightcrawler with the current active mission. |
+| `ncr templates` | List all available mission templates in `templates/`. |
 
-### Paper Monitoring
+### The Full Pipeline
 
-Configure `research/research-config.json`:
+```
+You (evening)                  Overnight                          You (morning)
+     |                              |                                   |
+     +-- ncr watch --daemon         |                                   |
+     +-- ncr research "topic"  ---> +-- Episode 1 (breadth scan)       |
+     +-- ncr launch                 +-- Episode 2 (deep A)             |
+     +-- Sleep                      +-- Episode 3 (deep B)             |
+                                    +-- Episode N (synthesis)           |
+                                    +-- COMPLETION_REPORT.md            |
+                                                                        +-- ncr synthesize
+                                                                        +-- ncr review
+                                                                        +-- literature-review.md ready
+```
+
+Each stage is independently useful. Watchtower runs as a cron job. The mission templates work without the CLI. Synthesis runs on any directory of markdown files from past missions. Nothing requires the whole stack to be running at once.
+
+### Components
+
+#### Watchtower (`research/watchtower.ts`)
+
+Polls three APIs for new papers matching your configured topics and keywords:
+
+- **arXiv RSS**: Daily feed per category (e.g., `cs.AI`, `cs.MA`). Instant for new preprints.
+- **arXiv Search API**: Keyword-based query across all dates. Catches papers outside your RSS categories.
+- **Semantic Scholar API**: 225M papers with citation counts, year, abstract. Best for relevance-ranked discovery.
+
+Papers are deduplicated by DOI/arXiv ID and scored by keyword relevance. Title matches are weighted 2x over abstract matches. Papers above `relevance_threshold` are written to `research/papers.jsonl`.
+
+If `auto_launch: true`, Watchtower generates a mission and starts Nightcrawler automatically when a sufficiently relevant paper arrives.
+
+Optional vault-aware boosting: if `vault_path` is set, papers whose abstracts mention topics already in your VaultGraph knowledge base score higher.
+
+#### Synthesis (`research/synthesis.ts`)
+
+Reads all markdown files in the research output directory after a mission completes and:
+
+1. Extracts findings tagged with confidence levels (`HIGH`, `MEDIUM`, `LOW`, `UNVERIFIED`)
+2. Detects contradictions: two findings that make opposing claims about the same subject
+3. Merges new findings into `literature-review.md`, deduplicating by semantic similarity
+4. Appends a contradiction log if any conflicts were detected
+
+The literature review accumulates across missions. Each run adds to it rather than replacing it, so the file grows into a comprehensive knowledge base over time.
+
+Confidence levels follow the research episode skill convention:
+
+| Level | Meaning |
+|-------|---------|
+| `HIGH` | Multiple independent sources agree |
+| `MEDIUM` | Single strong source, or multiple weak sources |
+| `LOW` | Single weak source, or inference from adjacent evidence |
+| `UNVERIFIED` | Claim with no traceable source; flagged for follow-up |
+
+#### Research Episode Skill (`skills/research-episode.md`)
+
+An enhanced version of the standard episode skill, loaded automatically for research missions. Teaches the agent:
+
+- How to query Semantic Scholar, OpenAlex, and arXiv APIs directly (with example curl commands)
+- The breadth-then-depth methodology: survey wide first, then pick the 3-5 most relevant threads to follow down
+- Cross-referencing protocol: when two sources conflict, note both, attribute the conflict, don't resolve it arbitrarily
+- Structured output format: findings with confidence tags, sources as numbered references, gaps section
+- Citation hygiene: every URL must resolve; hallucinated citations are flagged as fatal errors in the handoff
+
+#### Mission Templates
+
+Five templates live in `templates/`, each targeting a different research task shape:
+
+| Template | Use Case |
+|----------|----------|
+| `MISSION-literature-survey.md` | Comprehensive landscape scan of a field or topic. Breadth-first, then synthesize. Good starting point for any new research area. |
+| `MISSION-paper-deepdive.md` | Single paper analysis: methods, results, limitations, related work, open questions. Useful for important new preprints. |
+| `MISSION-gap-analysis.md` | Find what's missing. Maps existing work, then explicitly identifies unsolved problems and underexplored directions. |
+| `MISSION-systematic-review.md` | Structured evidence synthesis following PRISMA-adjacent methodology. Defines inclusion/exclusion criteria, records search protocol, grades evidence quality. |
+| `MISSION-followup.md` | Investigate a specific paper or thread flagged by Watchtower. Pre-populated with the paper's metadata; agent fills in the analysis. |
+
+`ncr research "topic"` renders `MISSION-literature-survey.md` with the topic filled in.
+`ncr deepdive "url"` renders `MISSION-paper-deepdive.md` with paper metadata fetched from arXiv.
+
+#### RESEARCH-IDEAS.md
+
+A catalog of 15 autonomous research engine architectures, included as a reference and inspiration document. Covers approaches ranging from citation graph traversal to adversarial paper debate to continuous hypothesis refinement loops. Not active code -- a design document.
+
+### Configuration (`research/research-config.json`)
 
 ```json
 {
@@ -599,25 +714,76 @@ Configure `research/research-config.json`:
 }
 ```
 
-Papers are scored by keyword relevance (title matches weighted 2x) with optional vault-aware boosting: papers whose abstracts connect to your existing notes in VaultGraph score higher.
+| Field | Default | Description |
+|-------|---------|-------------|
+| `topics` | `["cs.AI"]` | arXiv category codes for RSS feeds. See [arxiv.org/category_taxonomy](https://arxiv.org/category_taxonomy). |
+| `keywords` | `[]` | Keywords to match in titles and abstracts. Case-insensitive substring match. |
+| `semantic_scholar_api_key` | `""` | Optional API key for higher rate limits (100 RPS vs 1 RPS unauthenticated). Free at [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api). |
+| `poll_interval_minutes` | `60` | How often Watchtower polls when running as a daemon. |
+| `auto_launch` | `false` | Automatically start Nightcrawler when a paper above threshold is found. |
+| `min_citation_count` | `0` | Filter out papers with fewer citations. Useful for excluding preprints in established fields. |
+| `max_papers_per_poll` | `20` | Maximum papers to ingest per poll cycle, sorted by relevance score descending. |
+| `relevance_threshold` | `0.3` | Papers below this score are stored but not used to trigger missions. Range 0-1. |
+| `vault_path` | `""` | Path to a VaultGraph vault for graph-aware relevance boosting. Leave empty to skip. |
+| `output_dir` | `"research"` | Directory (relative to `~/.nightcrawler`) where research output and synthesis files are written. |
 
 ### Free APIs Used
 
-| API | Coverage | Cost |
-|-----|----------|------|
-| [Semantic Scholar](https://api.semanticscholar.org/) | 225M papers, recommendations | Free (100 RPS with key) |
-| [OpenAlex](https://openalex.org/) | 240M works, 50K added daily | Free (CC0) |
-| [arXiv](https://info.arxiv.org/help/api/) | RSS feeds + search API | Free |
+No paid data sources. No Python frameworks. No vendor lock-in.
 
-### What Makes This Different
+| API | Coverage | Rate Limit | Cost |
+|-----|----------|-----------|------|
+| [Semantic Scholar](https://api.semanticscholar.org/) | 225M papers, citation graph, recommendations | 100 RPS with free API key; 1 RPS without | Free |
+| [OpenAlex](https://openalex.org/) | 240M works, 50K added daily, full metadata | 100K req/day without key; higher with email param | Free (CC0) |
+| [arXiv RSS](https://arxiv.org/help/rss) | All categories, daily new papers | No limit | Free |
+| [arXiv Search API](https://info.arxiv.org/help/api/) | Full-text search across all arXiv | 3 req/sec suggested | Free |
 
-The gap in existing tools: no single system connects **paper monitoring → autonomous research → knowledge synthesis**.
+Semantic Scholar is the primary discovery engine. OpenAlex is used for cross-referencing and citation metadata. arXiv RSS is the fastest signal for brand-new preprints.
 
-- **AI-Scientist** (Sakana, 12k stars): Does the research, but doesn't monitor for new opportunities
-- **Ralph Loop** (snarktank, 11k stars): Loops autonomously, but has no research tooling
-- **Elicit**: Monitors papers, but can't act autonomously
-- **SciAgents** (MIT): Builds knowledge graphs, but can't run overnight
-- **Nightcrawler Research**: Watchtower detects paper → generates mission → Nightcrawler executes overnight → synthesis merges into knowledge graph → cycle repeats
+### Directory Structure (Research)
+
+The Research Toolkit adds these paths to the standard Nightcrawler layout:
+
+```
+~/.nightcrawler/
+  research/
+    watchtower.ts              # Paper monitor (arXiv RSS + Search, Semantic Scholar)
+    synthesis.ts               # Post-mission knowledge merger
+    ncr.ts                     # Unified CLI wrapper
+    research-config.json       # Research toolkit configuration
+    papers.jsonl               # All tracked papers with scores and metadata
+    literature-review.md       # Running synthesis (grows across missions)
+
+  skills/
+    nightcrawler-episode.md    # Standard episode skill
+    research-episode.md        # Enhanced episode skill for research missions
+
+  templates/
+    MISSION-research.md        # (existing) Quick-start research template
+    MISSION-implementation.md  # (existing) Quick-start implementation template
+    MISSION-literature-survey.md   # Comprehensive landscape scan
+    MISSION-paper-deepdive.md      # Single paper analysis
+    MISSION-gap-analysis.md        # Find what's missing in a field
+    MISSION-systematic-review.md   # Structured evidence synthesis
+    MISSION-followup.md            # Investigate watchtower-detected papers
+
+  RESEARCH-IDEAS.md            # Catalog of 15 autonomous research engine architectures
+```
+
+### Comparison with Existing Tools
+
+The gap nobody fills: a system that connects **paper monitoring** to **autonomous overnight research** to **accumulated knowledge synthesis**, running on your machine, using free APIs, requiring no framework installation.
+
+| Tool | Stars | What it does | What it doesn't do |
+|------|-------|-------------|-------------------|
+| **AI-Scientist** (Sakana) | 12.2k | Fully autonomous: hypothesis → experiment → paper | Doesn't monitor for new work; requires GPU; no episodic execution |
+| **SciAgents** (MIT) | 587 | Multi-agent knowledge graph construction from papers | Can't run overnight autonomously; no paper monitoring |
+| **CrewAI** | 44.5k | General multi-agent framework with research roles | No paper monitoring; no synthesis accumulation; no crash recovery |
+| **Elicit** | — | Literature review assistant, paper monitoring | Not autonomous; human-in-the-loop only |
+| **Ralph Loop** | ~11k | Continuous Claude Code loop | No research tooling; no structured handoffs; no paper monitoring |
+| **Nightcrawler Research** | — | Watchtower detects papers → generates missions → executes overnight → synthesis accumulates | Doesn't write LaTeX or run experiments (yet) |
+
+The key architectural difference: Nightcrawler Research is a **pipeline**, not a monolith. Each piece (Watchtower, mission templates, episodic execution, synthesis) works standalone. Watchtower can run as a cron job without Nightcrawler. Synthesis can run on past research output from any source. The mission templates work with standard Nightcrawler. You compose them in whatever order fits your workflow.
 
 ## Requirements
 

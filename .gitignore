@@ -6,8 +6,12 @@ missions/active/
 package-lock.json
 config.json
 research/papers.jsonl
+research/findings.jsonl
 research/literature-review.json
 research/literature-review.md
 research/research-config.json
 research/watchtower.log
 research/synthesis.log
+research-rs/target/
+research-rs/Cargo.lock
+test-output.md

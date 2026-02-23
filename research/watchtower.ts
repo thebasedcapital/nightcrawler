@@ -55,7 +55,7 @@ function loadSeenIds(): Set<string> {
   const seen = new Set<string>();
   if (!existsSync(PAPERS_PATH)) return seen;
   for (const line of readFileSync(PAPERS_PATH, "utf-8").split("\n").filter(Boolean)) {
-    try { seen.add((JSON.parse(line) as PaperRecord).id); } catch {}
+    try { seen.add((JSON.parse(line) as PaperRecord).id.toLowerCase()); } catch {}
   }
   return seen;
 }
@@ -106,6 +106,33 @@ function parseRSS(xml: string): RawPaper[] {
   return papers;
 }
 
+// ── arXiv Search API (keyword-based, works any day including weekends) ─
+
+async function searchArxiv(keywords: string[], limit: number): Promise<RawPaper[]> {
+  const q = keywords.map(kw => `all:"${kw.replace(/"/g, "")}"`).join("+OR+");
+  try {
+    const res = await fetch(`http://export.arxiv.org/api/query?search_query=${q}&max_results=${limit}&sortBy=submittedDate&sortOrder=descending`);
+    if (!res.ok) { log(`ARXIV_SEARCH_ERR | ${res.status}`); return []; }
+    const xml = await res.text();
+    const papers: RawPaper[] = [];
+    for (const entry of xml.split("<entry>").slice(1)) {
+      const idFull = entry.match(/<id>([\s\S]*?)<\/id>/)?.[1]?.trim() || "";
+      const aid = idFull.match(/(\d{4}\.\d{4,5})/)?.[1];
+      if (!aid) continue;
+      const title = entry.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.replace(/\s+/g, " ").trim() || "";
+      const abstract = entry.match(/<summary>([\s\S]*?)<\/summary>/)?.[1]?.replace(/\s+/g, " ").trim() || "";
+      const published = entry.match(/<published>([\s\S]*?)<\/published>/)?.[1]?.trim() || "";
+      const authors = [...entry.matchAll(/<author>\s*<name>([\s\S]*?)<\/name>/g)].map(m => m[1].trim());
+      papers.push({
+        id: `arXiv:${aid}`, title, abstract, authors,
+        url: `https://arxiv.org/abs/${aid}`,
+        date: published ? published.split("T")[0] : dateStr(),
+      });
+    }
+    return papers;
+  } catch (e: any) { log(`ARXIV_SEARCH_FETCH_ERR | ${e.message}`); return []; }
+}
+
 // ── Semantic Scholar ───────────────────────────────────────────────────────
 
 interface S2Paper extends RawPaper { citations: number }
@@ -151,7 +178,8 @@ function generateMission(paper: PaperRecord): boolean {
     .replace(/\{\{PAPER_ABSTRACT\}\}/g, paper.abstract.slice(0, 500))
     .replace(/\{\{PAPER_AUTHORS\}\}|\[Author list\]/g, paper.authors.join(", "))
     .replace(/\[Date\]/g, paper.date)
-    .replace(/\[DATE\]/g, dateStr());
+    .replace(/\[DATE\]/g, dateStr())
+    .replace(/\{\{DATE\}\}/g, dateStr());
   writeFileSync(dest, out);
   log(`MISSION_GEN | ${paper.title.slice(0, 60)}`);
   return true;
@@ -165,7 +193,7 @@ async function poll(config: Config, since: string): Promise<PaperRecord[]> {
   const found: PaperRecord[] = [];
 
   const add = (raw: RawPaper, src: "arxiv" | "s2", cites: number) => {
-    if (seen.has(raw.id)) return;
+    if (seen.has(raw.id.toLowerCase())) return;
     if (since && raw.date < since) return;
     if (cites < config.min_citation_count) return;
     const { matched, score: s } = score(raw.title, raw.abstract, config.keywords);
@@ -176,7 +204,7 @@ async function poll(config: Config, since: string): Promise<PaperRecord[]> {
       keywords_matched: matched, relevance_score: Math.round(s * 100) / 100,
       discovered_at: iso(), mission_generated: false,
     };
-    found.push(rec); savePaper(rec); seen.add(rec.id);
+    found.push(rec); savePaper(rec); seen.add(rec.id.toLowerCase());
     log(`NEW | ${src} | ${rec.relevance_score} | ${rec.title.slice(0, 70)}`);
   };
 
@@ -186,7 +214,11 @@ async function poll(config: Config, since: string): Promise<PaperRecord[]> {
     for (const p of await fetchArxiv(topic)) add(p, "arxiv", 0);
   }
 
-  // 2. Semantic Scholar keyword search
+  // 2. arXiv Search API (keyword-based, works on weekends)
+  log(`ARXIV_SEARCH | ${config.keywords.slice(0, 3).join(", ")}`);
+  for (const p of await searchArxiv(config.keywords.slice(0, 3), config.max_papers_per_poll)) add(p, "arxiv", 0);
+
+  // 3. Semantic Scholar keyword search
   const q = config.keywords.slice(0, 3).join(" ");
   log(`S2 | "${q}"`);
   await new Promise(r => setTimeout(r, 1100)); // respect 1 req/sec rate limit

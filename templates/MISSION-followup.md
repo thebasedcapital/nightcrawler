@@ -1,47 +1,43 @@
-# Mission: Follow-up Investigation — [TRIGGER]
+# Mission: Follow-Up Investigation — {{TOPIC}}
 
 **Type:** research
-**Created:** [DATE]
-**Skill:** research-episode.md
-**Triggered by:** [watchtower / manual / previous mission finding]
+**Created:** {{DATE}}
+**Triggered by:** {{TRIGGER}}
 
 ## Objective
 
-Investigate a specific finding, paper, or trigger detected by the watchtower or a previous research mission. Go deep on this specific topic and integrate findings into our knowledge base.
+Investigate a specific finding or question that emerged from previous research. Go deeper on this narrow topic.
 
-## Trigger
+## Context
 
-[What prompted this investigation?]
-- Paper: [title and URL if applicable]
-- Finding: [what was discovered]
-- Context: [why this matters]
+{{CONTEXT}}
+
+## Key Questions
+
+- [ ] {{QUESTION_1}}
+- [ ] {{QUESTION_2}}
+- [ ] {{QUESTION_3}}
 
 ## Depth Targets
 
-- [ ] Understand the trigger fully (read the paper, verify the claim)
-- [ ] Find related work that connects to or contradicts the trigger
-- [ ] Assess significance — is this actually new/important?
-- [ ] Identify how this relates to our existing research
-- [ ] Extract actionable insights
-- [ ] Update knowledge base with new information
+- [ ] Answer each key question with evidence
+- [ ] Find 3+ sources that directly address this topic
+- [ ] Assess confidence in each answer (HIGH/MEDIUM/LOW)
+- [ ] Identify remaining unknowns after investigation
+- [ ] Write concise analysis (target: 500-1500 words)
 
 ## Source Requirements
 
-- The trigger source itself
-- At least 5 related sources
-- At least 1 contradicting or alternative perspective
-- Flag any claim with only 1 source as [UNVERIFIED]
+- Minimum 5 sources
+- At least 1 primary source (original paper/data)
+- Cross-reference key claims
 
 ## Output Artifacts
 
-- `research/followup-[date]-[topic]-analysis.md` — Analysis
-- `research/followup-[date]-[topic]-sources.md` — Bibliography
-- `research/followup-[date]-[topic]-integration.md` — How this connects to existing work
+- `research/followup-[topic].md` — Investigation results
 
 ## Success Criteria
 
-- [ ] Trigger fully investigated
-- [ ] Related work found
-- [ ] Significance assessed
-- [ ] Knowledge base updated
-- [ ] Integration document written
+- [ ] All key questions addressed
+- [ ] Confidence levels assigned
+- [ ] Sources real and cited
