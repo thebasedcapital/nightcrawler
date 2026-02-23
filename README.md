@@ -517,7 +517,7 @@ The goal: wake up to a literature review, not a blank terminal.
 
 ```
                         WATCHTOWER
-                    (research/watchtower.ts)
+                      (Rust, ncr watch)
               ┌─────────────────────────────────┐
               │  arXiv RSS  arXiv Search API     │
               │  Semantic Scholar (225M papers)  │
@@ -527,7 +527,7 @@ The goal: wake up to a literature review, not a blank terminal.
                              │ relevant paper detected
                              ▼
                         NCR CLI
-                    (research/ncr.ts)
+                     (Rust, 4.2MB binary)
               ┌─────────────────────────────────┐
               │  ncr research "topic"            │
               │  ncr deepdive "arxiv.org/..."    │
@@ -548,7 +548,7 @@ The goal: wake up to a literature review, not a blank terminal.
                              │ research/*.md written
                              ▼
                        SYNTHESIS
-                   (research/synthesis.ts)
+                     (Rust, ncr synthesize)
               ┌─────────────────────────────────┐
               │  Reads research output markdown  │
               │  Extracts findings + confidence  │
@@ -563,43 +563,43 @@ The goal: wake up to a literature review, not a blank terminal.
 cd ~/.nightcrawler
 
 # 1. Start watching for new papers (one-shot poll)
-npx tsx research/ncr.ts watch
+ncr watch
 
 # 2. Generate a literature survey mission
-npx tsx research/ncr.ts research "autonomous AI research agents"
+ncr research "autonomous AI research agents"
 
 # 3. (Optional) Preview mission before launching
 cat missions/active/MISSION.md
 
 # 4. Launch Nightcrawler to execute the mission overnight
-npx tsx research/ncr.ts launch
+ncr launch
 
 # 5. Monitor progress
-npx tsx research/ncr.ts status
+ncr status
 
 # 6. After mission completes, synthesize findings
-npx tsx research/ncr.ts synthesize
+ncr synthesize
 
 # 7. View the running literature review
-npx tsx research/ncr.ts review
+ncr review
 ```
 
 To deep-dive a specific paper from an arXiv URL:
 
 ```bash
-npx tsx research/ncr.ts deepdive "https://arxiv.org/abs/2510.16572"
-npx tsx research/ncr.ts launch
+ncr deepdive "https://arxiv.org/abs/2510.16572"
+ncr launch
 ```
 
 To run the paper monitor continuously in the background:
 
 ```bash
-npx tsx research/ncr.ts watch --daemon
+ncr watch --daemon
 ```
 
 ### Research CLI (`ncr`)
 
-All commands are run via `npx tsx research/ncr.ts <command>` from `~/.nightcrawler`, or aliased as `ncr` if you add it to your PATH.
+The `ncr` binary is a native Rust CLI (4.2MB, zero runtime deps). Install with `cargo install --path research-rs` or copy `research-rs/target/release/ncr` to your PATH.
 
 | Command | Description |
 |---------|-------------|

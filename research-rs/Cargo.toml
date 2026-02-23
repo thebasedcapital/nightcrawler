@@ -1,0 +1,24 @@
+[package]
+name = "nightcrawler-research"
+version = "0.1.0"
+edition = "2021"
+description = "Paper monitoring, research missions, and knowledge synthesis for Nightcrawler"
+license = "MIT"
+
+[[bin]]
+name = "ncr"
+path = "src/main.rs"
+
+[dependencies]
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
+regex = "1"
+
+[profile.release]
+lto = true
+strip = true
+codegen-units = 1
