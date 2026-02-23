@@ -1,12 +1,14 @@
 {
   "topics": ["cs.AI", "cs.MA", "cs.SE"],
-  "keywords": ["autonomous agent", "multi-agent", "episodic execution", "research automation"],
+  "keywords": ["autonomous agent", "agent orchestration", "agentic workflow", "multi-agent coordination", "LLM agent"],
+  "negative_keywords": ["reinforcement learning", "autonomous driving", "traffic signal"],
   "semantic_scholar_api_key": "",
   "poll_interval_minutes": 60,
   "auto_launch": false,
   "min_citation_count": 0,
+  "min_keyword_matches": 2,
   "max_papers_per_poll": 20,
-  "relevance_threshold": 0.3,
+  "relevance_threshold": 0.35,
   "vault_path": "",
   "output_dir": "research"
 }

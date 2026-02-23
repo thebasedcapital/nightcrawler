@@ -642,7 +642,7 @@ Polls three APIs for new papers matching your configured topics and keywords:
 - **arXiv Search API**: Keyword-based query across all dates. Catches papers outside your RSS categories.
 - **Semantic Scholar API**: 225M papers with citation counts, year, abstract. Best for relevance-ranked discovery.
 
-Papers are deduplicated by DOI/arXiv ID and scored by keyword relevance. Title matches are weighted 2x over abstract matches. Papers above `relevance_threshold` are written to `research/papers.jsonl`.
+Papers are deduplicated by normalized ID (case-insensitive) and scored by keyword relevance. Title matches are weighted 3x over abstract matches; abstract-only hits are penalized 0.6x. Papers must match at least `min_keyword_matches` keywords and score above `relevance_threshold` to be written to `research/papers.jsonl`. Negative keywords (e.g., "reinforcement learning", "autonomous driving") instantly reject irrelevant papers.
 
 If `auto_launch: true`, Watchtower generates a mission and starts Nightcrawler automatically when a sufficiently relevant paper arrives.
 
@@ -702,13 +702,15 @@ A catalog of 15 autonomous research engine architectures, included as a referenc
 ```json
 {
   "topics": ["cs.AI", "cs.MA", "cs.SE"],
-  "keywords": ["autonomous agent", "multi-agent", "episodic"],
+  "keywords": ["autonomous agent", "agent orchestration", "agentic workflow", "multi-agent coordination", "LLM agent"],
+  "negative_keywords": ["reinforcement learning", "autonomous driving", "traffic signal", "vehicle"],
   "semantic_scholar_api_key": "",
   "poll_interval_minutes": 60,
   "auto_launch": false,
   "min_citation_count": 0,
+  "min_keyword_matches": 2,
   "max_papers_per_poll": 20,
-  "relevance_threshold": 0.3,
+  "relevance_threshold": 0.35,
   "vault_path": "",
   "output_dir": "research"
 }
@@ -723,7 +725,9 @@ A catalog of 15 autonomous research engine architectures, included as a referenc
 | `auto_launch` | `false` | Automatically start Nightcrawler when a paper above threshold is found. |
 | `min_citation_count` | `0` | Filter out papers with fewer citations. Useful for excluding preprints in established fields. |
 | `max_papers_per_poll` | `20` | Maximum papers to ingest per poll cycle, sorted by relevance score descending. |
-| `relevance_threshold` | `0.3` | Papers below this score are stored but not used to trigger missions. Range 0-1. |
+| `min_keyword_matches` | `2` | Require at least N keyword matches before considering a paper. Prevents single-keyword noise. |
+| `negative_keywords` | `[]` | Papers matching any of these keywords are instantly rejected, regardless of positive score. |
+| `relevance_threshold` | `0.35` | Papers below this score are stored but not used to trigger missions. Range 0-1. |
 | `vault_path` | `""` | Path to a VaultGraph vault for graph-aware relevance boosting. Leave empty to skip. |
 | `output_dir` | `"research"` | Directory (relative to `~/.nightcrawler`) where research output and synthesis files are written. |
 
@@ -746,12 +750,22 @@ The Research Toolkit adds these paths to the standard Nightcrawler layout:
 
 ```
 ~/.nightcrawler/
+  research-rs/                 # Rust CLI (ncr binary)
+    src/
+      main.rs                  # CLI entry, 9 subcommands, mission gen
+      watchtower.rs            # arXiv RSS + Search + S2 with retry/backoff
+      synthesis.rs             # Finding extraction, contradiction detection
+      paper.rs                 # Paper struct, scoring, JSONL I/O
+      config.rs                # Config structs, directory helpers
+    Cargo.toml
+
   research/
-    watchtower.ts              # Paper monitor (arXiv RSS + Search, Semantic Scholar)
-    synthesis.ts               # Post-mission knowledge merger
-    ncr.ts                     # Unified CLI wrapper
+    watchtower.ts              # Paper monitor (TS, superseded by Rust)
+    synthesis.ts               # Knowledge merger (TS, superseded by Rust)
+    ncr.ts                     # CLI wrapper (TS, superseded by Rust)
     research-config.json       # Research toolkit configuration
     papers.jsonl               # All tracked papers with scores and metadata
+    literature-review.json     # Structured findings (JSON)
     literature-review.md       # Running synthesis (grows across missions)
 
   skills/
@@ -759,8 +773,8 @@ The Research Toolkit adds these paths to the standard Nightcrawler layout:
     research-episode.md        # Enhanced episode skill for research missions
 
   templates/
-    MISSION-research.md        # (existing) Quick-start research template
-    MISSION-implementation.md  # (existing) Quick-start implementation template
+    MISSION-research.md        # Quick-start research template
+    MISSION-implementation.md  # Quick-start implementation template
     MISSION-literature-survey.md   # Comprehensive landscape scan
     MISSION-paper-deepdive.md      # Single paper analysis
     MISSION-gap-analysis.md        # Find what's missing in a field
