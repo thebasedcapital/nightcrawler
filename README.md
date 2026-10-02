@@ -693,10 +693,6 @@ Five templates live in `templates/`, each targeting a different research task sh
 `ncr research "topic"` renders `MISSION-literature-survey.md` with the topic filled in.
 `ncr deepdive "url"` renders `MISSION-paper-deepdive.md` with paper metadata fetched from arXiv.
 
-#### RESEARCH-IDEAS.md
-
-A catalog of 15 autonomous research engine architectures, included as a reference and inspiration document. Covers approaches ranging from citation graph traversal to adversarial paper debate to continuous hypothesis refinement loops. Not active code -- a design document.
-
 ### Configuration (`research/research-config.json`)
 
 ```json
@@ -780,8 +776,6 @@ The Research Toolkit adds these paths to the standard Nightcrawler layout:
     MISSION-gap-analysis.md        # Find what's missing in a field
     MISSION-systematic-review.md   # Structured evidence synthesis
     MISSION-followup.md            # Investigate watchtower-detected papers
-
-  RESEARCH-IDEAS.md            # Catalog of 15 autonomous research engine architectures
 ```
 
 ### Comparison with Existing Tools
